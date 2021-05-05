@@ -122,7 +122,7 @@ reconstructedCompressedSolution = np.dot(CompressedSolutionU, reducedOrderBasisU
 reconstructedCompressedSolution=reconstructedCompressedSolution.reshape(numberOfNodes,nbeOfComponentsPrimal)
 
 VTKBase = MR.VTKReadmesh(FineData+"/snapshot_0.vtu")
-SVTKW.numpyToVTKWrite(VTKBase,reconstructedCompressedSolution,FineData+"/approximation"+str(nev)+".vtu")
+SVTKW.numpyToVTKWrite(VTKBase,reconstructedCompressedSolution,"approximation"+str(nev)+".vtu")
 
 reconstructedCompressedSolution=reconstructedCompressedSolution.flatten()
 
