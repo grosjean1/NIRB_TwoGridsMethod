@@ -101,7 +101,7 @@ else:
     for i, snapshot1 in enumerate(snapshots):
         
         matVecProduct = l2ScalarProducMatrix.dot(snapshot1)
-        for j in range(i,ns):
+        for j in range(0,i+1):
             CorrMatrix[i, j] = matVecProduct.dot(snapshots[j])
     for j, snapshot1 in enumerate(snapshots):
         for i in range(j,ns):
