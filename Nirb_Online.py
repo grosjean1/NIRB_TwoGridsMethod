@@ -9,8 +9,8 @@ import os.path as osp
 import pickle
 
 from BasicTools.FE import FETools as FT
-import MeshReader as MR
-import SolutionReader as VTKSR
+import Readers as MR
+
 import SolutionVTKWriter as SVTKW
 
 import numpy as np
@@ -79,7 +79,7 @@ h1ScalarProducMatrix = FT.ComputeH10ScalarProductMatrix(Finemesh, nbeOfComponent
 """
 
 #coarse solution
-CoarseSnapshot =VTKSR.VTKReadToNp("Velocity",CoarseData+"/snapshot_",ns)
+CoarseSnapshot =MR.VTKReadToNp("Velocity",CoarseData+"/snapshot_",ns-1)
 
 #interpolation (nearest)
 
@@ -134,7 +134,7 @@ print(" STEP4: L2 and H1 errors           ")
 print("-----------------------------------")
 
 print("reading exact solution...")
-exactSolution=VTKSR.VTKReadToNp("Velocity",FineData+"/snapshot_",ns).flatten()
+exactSolution=MR.VTKReadToNp("Velocity",FineData+"/snapshot_",ns-1).flatten()
 compressionErrors=[]
 H1compressionErrors=[]
 norml2ExactSolution=np.sqrt(exactSolution@(l2ScalarProducMatrix@exactSolution))

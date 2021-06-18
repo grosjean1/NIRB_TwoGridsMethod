@@ -8,13 +8,13 @@ import os
 import os.path as osp
 
 from BasicTools.FE import FETools as FT
-import MeshReader as MR
-import SolutionReader as VTKSR
+import Readers as MR
+
 
 #from initCase import initproblem
 
 import pickle
-import POD
+import SVD
 import Greedy as GD
 import numpy as np
 import sys
@@ -81,7 +81,7 @@ h1ScalarProducMatrix = FT.ComputeH10ScalarProductMatrix(Finemesh, nbeOfComponent
 
 for i in range(ns):
 
-    snapshot =VTKSR.VTKReadToNp("Velocity",FineData+"/snapshot_",i).flatten()
+    snapshot =MR.VTKReadToNp("Velocity",FineData+"/snapshot_",i).flatten()
     snapshots.append(snapshot)
     #print("snapshot defined in " + FineData + "snapshot_"+str(i)+" has been read")
   
@@ -91,7 +91,7 @@ print("-----------------------------------")
 print(" STEP1: Offline                    ")
 print("-----------------------------------")
 nev=1
-tol=1e-4
+tol=1e-6
 if len(sys.argv)>1:
     nev=int(sys.argv[1]) #11   #number of modes ( apriori) or with eigenvalues of POD close to 1
 else:
@@ -99,14 +99,13 @@ else:
     CorrMatrix=np.zeros((ns,ns))
     snapshots = np.array(snapshots)
     for i, snapshot1 in enumerate(snapshots):
-        
         matVecProduct = l2ScalarProducMatrix.dot(snapshot1)
         for j in range(0,i+1):
             CorrMatrix[i, j] = matVecProduct.dot(snapshots[j])
     for j, snapshot1 in enumerate(snapshots):
         for i in range(j,ns):
             CorrMatrix[j,i]=CorrMatrix[i,j]
-    nev,eigenvalues=POD.GetNev(CorrMatrix,tol) #if use of RIC
+    nev,eigenvalues=SVD.GetNev(CorrMatrix,tol) #if use of RIC
 
 print("number of modes: ",nev)
 
