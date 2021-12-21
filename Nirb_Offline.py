@@ -3,16 +3,17 @@
 
 ## Elise Grosjean
 ## 01/2021
+""" 
+NIRB 2 grids method
+Offline part with Greedy algorithm and rectification (RectificationPT=False otherwise)
 
+"""
 import os
 import os.path as osp
 
 from BasicTools.FE import FETools as FT
 import Readers as MR
-
-
 #from initCase import initproblem
-
 import pickle
 import SVD
 import Greedy as GD
@@ -28,13 +29,24 @@ Create data (mesh1,mesh2,snapshots,uH) for Sorbonne usecase
 ----------------------------
               generate snapshots
 ----------------------------
-""" 
+"""
+
+### INIT ### 
 ## Directories
 currentFolder=os.getcwd()
 FineData=osp.join(currentFolder,'Fine')
 
 ## Script Files - Initiate data
 externalFolder=osp.join(currentFolder,'External')  #BLACK-BOX SOLVER
+
+
+## post-treatment
+RectificationPT=True
+
+dimension=3 ## spatial dimension
+nbeOfComponentsPrimal = 3 #number of components of the field
+
+#################################################"
 
 
 print("-----------------------------------")
@@ -57,25 +69,19 @@ for _, _, files in os.walk(FineData): #number of files in FineData
     ns=len(files)
 print("number of snapshots: ",ns)
 
-dimension=3
-           
 ## READ FINE MESH
 meshFileName=FineData+"/snapshot_0.vtu"
 Finemesh = MR.Readmesh(meshFileName)
-
-
 print("Mesh defined in " + meshFileName + " has been read")
 
-nbeOfComponentsPrimal = 3 #nbre de composants du champ
 numberOfNodes = Finemesh.GetNumberOfNodes()
-print("nbNodes",numberOfNodes)
+print("number of nodes",numberOfNodes)
 
 snapshots = []
 
 print("ComputeL2ScalarProducMatrix and H1ScalarProducMatrix with BasicTools...")
 from scipy import sparse
 #l2ScalarProducMatrix=sparse.eye(numberOfNodes*nbeOfComponentsPrimal)
-#unstructuredMesh = Finemesh.GetInternalStorage()
 l2ScalarProducMatrix = FT.ComputeL2ScalarProducMatrix(Finemesh, nbeOfComponentsPrimal)
 h1ScalarProducMatrix = FT.ComputeH10ScalarProductMatrix(Finemesh, nbeOfComponentsPrimal)
 
@@ -95,22 +101,59 @@ tol=1e-6
 if len(sys.argv)>1:
     nev=int(sys.argv[1]) #11   #number of modes ( apriori) or with eigenvalues of POD close to 1
 else:
-    NBdeg=numberOfNodes*nbeOfComponentsPrimal
-    CorrMatrix=np.zeros((ns,ns))
-    snapshots = np.array(snapshots)
-    for i, snapshot1 in enumerate(snapshots):
-        matVecProduct = l2ScalarProducMatrix.dot(snapshot1)
-        for j in range(0,i+1):
-            CorrMatrix[i, j] = matVecProduct.dot(snapshots[j])
-    for j, snapshot1 in enumerate(snapshots):
-        for i in range(j,ns):
-            CorrMatrix[j,i]=CorrMatrix[i,j]
-    nev,eigenvalues=SVD.GetNev(CorrMatrix,tol) #if use of RIC
+    tol=1e-6
 
 print("number of modes: ",nev)
 
 ##### ALGO GREEDY
-reducedOrderBasisU=GD.Greedy(snapshots,l2ScalarProducMatrix,h1ScalarProducMatrix,nev)
+reducedOrderBasisU=GD.Greedy(snapshots,l2ScalarProducMatrix,h1ScalarProducMatrix,nev,tol)
+nev=np.shape(reducedOrderBasisU)[0]
+print("number of modes : ", nev)
+
+print("-----------------------------------")
+print("---- RECTIFICATION POST-TREATMENT -")
+print("-----------------------------------")
+#provided several coarse snapshots
+
+if RectificationPT==True:
+    CoarseData=osp.join(currentFolder,'Coarse')
+    ## READ COARSE MESH
+    meshFileName=CoarseData+"/snapshot_0.vtu"
+    Coarsemesh = MR.Readmesh(meshFileName)
+    print("Mesh defined in " + meshFileName + " has been read")
+
+    CoarseSnapshots=[]
+    for i in range(ns):
+        snapshotH =MR.VTKReadToNp("Velocity",CoarseData+"/snapshot_",i)#.flatten()
+        #interpolation (nearest)
+
+        inputmesh=Coarsemesh
+        inputnodes=inputmesh.nodes
+        outputmesh=Finemesh
+        outputnodes=outputmesh.nodes
+        from scipy.spatial import cKDTree
+        #from scipy import sparse
+        from scipy.sparse import coo_matrix 
+
+        kdt = cKDTree(inputnodes)
+        nbtp = outputnodes.shape[0]
+        _, ids = kdt.query(outputnodes)
+        cols=ids
+        row = np.arange(nbtp)
+        data = np.ones(nbtp)
+        Operator=coo_matrix((data, (row, cols)), shape=(nbtp , inputnodes.shape[0]))
+
+        #Compute the projected data using the projection operator
+        CoarseInterpolatedSnapshot = Operator.dot(snapshotH)
+        snapshotH=CoarseInterpolatedSnapshot.flatten()
+
+        CoarseSnapshots.append(snapshotH)
+    
+    R=GD.Rectification(snapshots,CoarseSnapshots,reducedOrderBasisU,l2ScalarProducMatrix,nev)
+    outputName = "rectification.pkl"
+    output = open(outputName, "wb")
+    pickle.dump(R, output)
+    output.close()
 
 print("-----------------------------------")
 print(" STEP1:Reduced Basis created       ")

@@ -28,7 +28,7 @@ for _, _, files in os.walk(FineData): #compte le nombre de fichiers dans FineDat
 print("number of snapshots: ",ns)
 
 dimension=3
-
+RectificationPT=True ##rectification Post-treatment
 print("-----------------------------------")
 print(" STEP2: start Online nirb          ")
 print("-----------------------------------")
@@ -114,7 +114,24 @@ print("-----------------------------------")
 print(" STEP3: Snapshot compression       ")
 print("-----------------------------------")
 CompressedSolutionU= CoarseInterpolatedSnapshot@(l2ScalarProducMatrix@reducedOrderBasisU.transpose())
-reconstructedCompressedSolution = np.dot(CompressedSolutionU, reducedOrderBasisU)
+
+if RectificationPT==True:
+    # retrieve the reduced basis
+    inputName="rectification.pkl"
+    R=pickle.load(open(inputName, "rb"))
+    coef=np.zeros(nev)
+    for i in range(nev):
+        coef[i]=0
+        for j in range(nev):
+            coef[i]+=R[i,j]*CompressedSolutionU[j]
+        
+    #print("coef without rectification: ", CompressedSolutionU[0])
+    #print("coef with rectification ", coef)
+
+    reconstructedCompressedSolution = np.dot(coef, reducedOrderBasisU) #with rectification
+
+else:
+    reconstructedCompressedSolution = np.dot(CompressedSolutionU, reducedOrderBasisU)
     ##################################################
     # SAVE APPROXIMATION TO VTK
     ##################################################
